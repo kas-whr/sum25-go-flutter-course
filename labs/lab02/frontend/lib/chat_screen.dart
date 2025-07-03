@@ -17,6 +17,7 @@ class _ChatScreenState extends State<ChatScreen> {
   // TODO: Subscribe to chatService.messageStream
   // TODO: Implement UI for sending and displaying messages
   // TODO: Simulate chat logic for tests (current implementation is a simulation)
+  
 
   @override
   void initState() {
