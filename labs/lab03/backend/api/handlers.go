@@ -39,7 +39,7 @@ func (h *Handler) SetupRoutes() *mux.Router {
 	// GET /health -> h.HealthCheck
 	// TODO: Return the router
 	r := mux.NewRouter()
-	r.Use(corsMiddleware)
+	/* r.Use(corsMiddleware) */
 
 	api := r.PathPrefix("/api").Subrouter()
 	api.HandleFunc("/messages", h.GetMessages).Methods("GET")
@@ -48,6 +48,15 @@ func (h *Handler) SetupRoutes() *mux.Router {
 	api.HandleFunc("/messages/{id}", h.DeleteMessage).Methods("DELETE")
 	api.HandleFunc("/status/{code}", h.GetHTTPStatus).Methods("GET")
 	api.HandleFunc("/health", h.HealthCheck).Methods("GET")
+	api.HandleFunc("/cat/{code}", h.ProxyCatImage).Methods("GET")
+
+	api.HandleFunc("/messages", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}).Methods("OPTIONS")
+
+	api.HandleFunc("/messages/{id}", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}).Methods("OPTIONS")
 
 	return r
 }
@@ -176,7 +185,7 @@ func (h *Handler) GetHTTPStatus(w http.ResponseWriter, r *http.Request) {
 
 	resp := models.HTTPStatusResponse{
 		StatusCode:  code,
-		ImageURL:    fmt.Sprintf("https://http.cat/%d", code),
+		ImageURL:    fmt.Sprintf("http://localhost:8080/api/cat/%d", code),
 		Description: getHTTPStatusDescription(code),
 	}
 
@@ -196,12 +205,17 @@ func (h *Handler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	//   - total_messages: count from storage
 	// Write JSON response with status 200
 	response := map[string]interface{}{
-		"status":         "ok",
+		"status":         "healthy",
 		"message":        "API is running",
 		"timestamp":      time.Now(),
 		"total_messages": h.store.Count(),
 	}
 	h.writeJSON(w, http.StatusOK, response)
+}
+
+func (h *Handler) ProxyCatImage(w http.ResponseWriter, r *http.Request) {
+	code := mux.Vars(r)["code"]
+	http.Redirect(w, r, fmt.Sprintf("https://http.cat/%s", code), http.StatusFound)
 }
 
 // Helper function to write JSON responses
@@ -248,6 +262,10 @@ func getHTTPStatusDescription(code int) string {
 	// 500: "Internal Server Error", etc.
 	// Return "Unknown Status" for unrecognized codes
 	switch code {
+	case 100:
+		return "Continue"
+	case 101:
+		return "Switching Protocols"
 	case 200:
 		return "OK"
 	case 201:
@@ -260,8 +278,14 @@ func getHTTPStatusDescription(code int) string {
 		return "Unauthorized"
 	case 404:
 		return "Not Found"
+	case 418:
+		return "I'm a teapot"
 	case 500:
 		return "Internal Server Error"
+	case 503:
+		return "Service Unavailable"
+	case 999:
+		return "Custom Status"
 	default:
 		return "Unknown Status"
 	}

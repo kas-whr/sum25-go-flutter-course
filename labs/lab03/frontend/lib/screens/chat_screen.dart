@@ -18,7 +18,8 @@ class _ChatScreenState extends State<ChatScreen> {
   // TODO: Add String? _error;
   // TODO: Add final TextEditingController _usernameController = TextEditingController();
   // TODO: Add final TextEditingController _messageController = TextEditingController();
-  final ApiService _apiService = ApiService();
+  late ApiService _apiService;
+  bool _initialized = false;
   List<Message> _messages = [];
   bool _isLoading = false;
   String? _error;
@@ -26,9 +27,19 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _apiService = Provider.of<ApiService>(context, listen: false);
+      _loadMessages();
+      _initialized = true;
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
-    // TODO: Call _loadMessages() to load initial data
+    _apiService = Provider.of<ApiService>(context, listen: false);
     _loadMessages();
   }
 
@@ -97,6 +108,11 @@ class _ChatScreenState extends State<ChatScreen> {
         _messages.insert(0, message);
         _messageController.clear();
       });
+
+      // ✅ Показываем SnackBar
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Message sent')),
+      );
     } catch (e) {
       _showError(e.toString());
     }
@@ -185,8 +201,15 @@ class _ChatScreenState extends State<ChatScreen> {
       await showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          title: Text("${result.statusCode} - ${result.description}"),
-          content: Image.network(result.imageUrl, errorBuilder: (_, __, ___) => const Icon(Icons.error)),
+          title: Text("HTTP Status: ${result.statusCode}"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(result.description),
+              const SizedBox(height: 8),
+              Image.network(result.imageUrl, errorBuilder: (_, __, ___) => const Icon(Icons.error)),
+            ],
+          ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text("Close"))
           ],
@@ -251,19 +274,21 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           TextField(
             controller: _usernameController,
-            decoration: const InputDecoration(labelText: "Username"),
+            decoration: const InputDecoration(hintText: "Enter your username"),
           ),
           TextField(
             controller: _messageController,
-            decoration: const InputDecoration(labelText: "Message"),
+            decoration: const InputDecoration(hintText: "Enter your message"),
           ),
           Row(
             children: [
-              ElevatedButton(onPressed: _sendMessage, child: const Text("Send")),
-              const SizedBox(width: 16),
-              ElevatedButton(onPressed: () => _showHTTPStatus(200), child: const Text("Cat 200")),
-              ElevatedButton(onPressed: () => _showHTTPStatus(404), child: const Text("Cat 404")),
-              ElevatedButton(onPressed: () => _showHTTPStatus(500), child: const Text("Cat 500")),
+              Expanded(child: ElevatedButton(onPressed: _sendMessage, child: const Text("Send"))),
+              const SizedBox(width: 8),
+              Expanded(child: ElevatedButton(onPressed: () => _showHTTPStatus(200), child: const Text("200 OK"))),
+              const SizedBox(width: 8),
+              Expanded(child: ElevatedButton(onPressed: () => _showHTTPStatus(404), child: const Text("404 Not Found"))),
+              const SizedBox(width: 8),
+              Expanded(child: ElevatedButton(onPressed: () => _showHTTPStatus(500), child: const Text("500 Error"))),
             ],
           ),
         ],
@@ -282,7 +307,7 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error, size: 64, color: Colors.red),
+          const Icon(Icons.error_outline, size: 64, color: Colors.red),
           const SizedBox(height: 12),
           Text(_error ?? "Unknown error", style: const TextStyle(color: Colors.red)),
           ElevatedButton(onPressed: _loadMessages, child: const Text("Retry")),
@@ -314,17 +339,25 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(onPressed: _loadMessages, icon: const Icon(Icons.refresh)),
         ],
       ),
-      /* body: const Center(
-        child: Text('TODO: Implement chat functionality'),
-      ), */
       body: _isLoading
           ? _buildLoadingWidget()
           : _error != null
               ? _buildErrorWidget()
-              : ListView.builder(
-                  itemCount: _messages.length,
-                  itemBuilder: (_, i) => _buildMessageTile(_messages[i]),
-                ),
+              : _messages.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Text('No messages yet'),
+                          SizedBox(height: 8),
+                          Text('Send your first message to get started!'),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: _messages.length,
+                      itemBuilder: (_, i) => _buildMessageTile(_messages[i]),
+                    ),
       bottomSheet: _buildMessageInput(),
       floatingActionButton: FloatingActionButton(
         onPressed: _loadMessages,

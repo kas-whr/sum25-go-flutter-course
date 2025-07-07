@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import '../models/message.dart';
 import 'dart:io';
 import 'dart:async';
@@ -19,8 +20,8 @@ class ApiService {
 
   // TODO: Add _getHeaders() method that returns Map<String, String>
   // Return headers with 'Content-Type': 'application/json' and 'Accept': 'application/json'
-  ApiService() {
-    _client = http.Client();
+  ApiService({http.Client? client}) {
+    _client = client ?? http.Client();
   }
 
   void dispose() {
@@ -48,8 +49,12 @@ class ApiService {
       final decoded = json.decode(response.body);
       return fromJson(decoded);
     } else if (status >= 400 && status < 500) {
-      final error = json.decode(response.body);
-      throw ApiException(error['error'] ?? 'Client error');
+      try {
+        final error = json.decode(response.body);
+        throw ApiException(error['error'] ?? 'Client error');
+      } catch (_) {
+        throw ApiException('Client error: $status');
+      }
     } else if (status >= 500 && status < 600) {
       throw ServerException('Server error: $status');
     } else {
@@ -80,6 +85,8 @@ class ApiService {
       throw NetworkException('Request timed out');
     } on SocketException {
       throw NetworkException('Network error');
+    } catch (e) {
+      throw ApiException(e.toString());
     }
   }
 
@@ -110,10 +117,15 @@ class ApiService {
           )
           .timeout(timeout);
 
-      final apiResp = _handleResponse(response, (json) => ApiResponse<Message>.fromJson(json, Message.fromJson));
+      final apiResp = _handleResponse(
+        response,
+        (json) => ApiResponse<Message>.fromJson(json, Message.fromJson),
+      );
       return apiResp.data!;
     } on SocketException {
       throw NetworkException('Network error');
+    } catch (e) {
+      throw ApiException(e.toString());
     }
   }
 
@@ -144,10 +156,15 @@ class ApiService {
           )
           .timeout(timeout);
 
-      final apiResp = _handleResponse(response, (json) => ApiResponse<Message>.fromJson(json, Message.fromJson));
+      final apiResp = _handleResponse(
+        response,
+        (json) => ApiResponse<Message>.fromJson(json, Message.fromJson),
+      );
       return apiResp.data!;
     } on SocketException {
       throw NetworkException('Network error');
+    } catch (e) {
+      throw ApiException(e.toString());
     }
   }
 
@@ -172,6 +189,8 @@ class ApiService {
       }
     } on SocketException {
       throw NetworkException('Network error');
+    } catch (e) {
+      throw ApiException(e.toString());
     }
   }
 
@@ -186,15 +205,24 @@ class ApiService {
     // Make GET request to '$baseUrl/api/status/$statusCode'
     // Use _handleResponse to parse response
     // Extract HTTPStatusResponse from ApiResponse.data
+    if (statusCode < 100 || statusCode >= 600) {
+      throw ApiException('Invalid status code');
+    }
+
     try {
       final response = await _client
           .get(Uri.parse('$baseUrl/api/status/$statusCode'), headers: _getHeaders())
           .timeout(timeout);
 
-      final apiResp = _handleResponse(response, (json) => ApiResponse<HTTPStatusResponse>.fromJson(json, HTTPStatusResponse.fromJson));
+      final apiResp = _handleResponse(
+        response,
+        (json) => ApiResponse<HTTPStatusResponse>.fromJson(json, HTTPStatusResponse.fromJson),
+      );
       return apiResp.data!;
     } on SocketException {
       throw NetworkException('Network error');
+    } catch (e) {
+      throw ApiException(e.toString());
     }
   }
 
@@ -216,6 +244,8 @@ class ApiService {
       return json.decode(response.body);
     } on SocketException {
       throw NetworkException('Network error');
+    } catch (e) {
+      throw ApiException(e.toString());
     }
   }
 }

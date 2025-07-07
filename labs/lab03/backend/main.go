@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rs/cors"
-
 	"lab03-backend/api"
 	"lab03-backend/storage"
+
+	"github.com/rs/cors"
 )
 
 func main() {
@@ -28,10 +28,11 @@ func main() {
 	//   - WriteTimeout: 15 seconds
 	//   - IdleTimeout: 60 seconds
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"*"}, // или конкретный адрес фронта
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
-		AllowedHeaders:   []string{"*"},
-		AllowCredentials: true,
+		AllowedOrigins:     []string{"http://localhost:3000"},
+		AllowedMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:     []string{"Content-Type", "Authorization"},
+		AllowCredentials:   true,
+		OptionsPassthrough: false,
 	})
 
 	srv := &http.Server{
@@ -45,8 +46,7 @@ func main() {
 	// TODO: Add logging to show server is starting
 	// TODO: Start the server and handle any errors
 	log.Println("Server started on :8080")
-	err := srv.ListenAndServe()
-	if err != nil && err != http.ErrServerClosed {
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatalf("Could not start server: %v\n", err)
 	}
 }
